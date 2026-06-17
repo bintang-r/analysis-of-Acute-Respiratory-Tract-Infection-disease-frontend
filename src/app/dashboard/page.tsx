@@ -9,7 +9,7 @@ import { Activity, Clock, FileText, PlusCircle, User as UserIcon, MessageSquare,
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 export default function Dashboard() {
-    const { user, login, isAuthenticated } = useAuthStore();
+    const { user, login, isAuthenticated, checkAuth } = useAuthStore();
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
@@ -35,22 +35,26 @@ export default function Dashboard() {
     const [testiMsg, setTestiMsg] = useState('');
     const [hasSubmittedTesti, setHasSubmittedTesti] = useState(false);
 
+    // On mount: hydrate auth from localStorage, redirect if no token
     useEffect(() => {
         setMounted(true);
-        if (!isAuthenticated && !localStorage.getItem('access_token')) {
+        checkAuth();
+        const token = localStorage.getItem('access_token');
+        if (!token) {
             router.push('/login');
-            return;
         }
+    }, []);
 
-        if (isAuthenticated) {
-            api.get('consultations/').then(res => setHistory(res.data)).catch(console.error);
-            api.get('testimonials/').then(res => {
-                if (res.data.some((t: any) => t.user_name === user?.full_name)) {
-                    setHasSubmittedTesti(true);
-                }
-            }).catch(console.error);
-        }
-    }, [user, isAuthenticated]);
+    // Fetch data once isAuthenticated becomes true (fires after checkAuth() triggers re-render)
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        api.get('consultations/').then(res => setHistory(res.data)).catch(console.error);
+        api.get('testimonials/').then(res => {
+            if (res.data.some((t: any) => t.user_name === user?.full_name)) {
+                setHasSubmittedTesti(true);
+            }
+        }).catch(console.error);
+    }, [isAuthenticated]);
 
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
